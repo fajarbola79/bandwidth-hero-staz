@@ -1,9 +1,9 @@
 const sharp = require("sharp");
 
 function compress(imageBuffer, width = null, quality = 80, originalSize = null) {
-  const format = "webp"; // modern default
-  const kernel = "lanczos3"; // sharper downscale
-  const sharpenAmount = 0.6; // mild sharpen
+  const format = "jpeg"; // default jadi JPEG
+  const kernel = "mitchell"; // smooth & stabil
+  const sharpenAmount = 0.4; // mild sharpen
 
   let pipeline = sharp(imageBuffer, { animated: false });
 
@@ -11,16 +11,19 @@ function compress(imageBuffer, width = null, quality = 80, originalSize = null) 
     if (width && meta.width && width < meta.width) {
       pipeline = pipeline.resize(width, null, {
         fit: "inside",
-        kernel, // sharper resize
+        kernel,
+        withoutEnlargement: true, // jangan besarkan gambar
       });
 
-      // apply mild sharpening after downscale
+      // mild sharpening
       pipeline = pipeline.sharpen(sharpenAmount);
     }
 
     pipeline = pipeline.toFormat(format, {
       quality: Math.max(1, Math.min(100, quality)),
-      chromaSubsampling: '4:4:4',
+      progressive: true,
+      mozjpeg: true,
+      chromaSubsampling: "4:4:4",
     });
 
     return pipeline
