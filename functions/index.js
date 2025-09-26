@@ -4,10 +4,19 @@ const pick = require("../util/pick"),
   compress = require("../util/compress"),
   DEFAULT_QUALITY = 40;
 
-exports.handler = async (e, t) => {
+exports.handler = async (e) => {
   let { url: r } = e.queryStringParameters || {};
-  // baca semua param penting
-  const { jpeg: jpegParam, bw: bwParam, w: wParam, h: hParam, q: qParam, f: fParam } = e.queryStringParameters || {};
+  const {
+    jpeg: jpegParam,
+    bw: bwParam,
+    w: wParam,
+    h: hParam,
+    q: qParam,
+    f: fParam,
+    k: kernelParam,
+    noUpscale: noUpscaleParam,
+    sa: sharpenAmountParam,
+  } = e.queryStringParameters || {};
 
   if (!r) return { statusCode: 200, body: "Bandwidth Hero Data Compression Service" };
 
@@ -15,14 +24,16 @@ exports.handler = async (e, t) => {
   Array.isArray(r) && (r = r.join("&url="));
   r = r.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  // safe parsing
-  const useJpeg = (jpegParam === '1' || jpegParam === 'true' || fParam === 'jpeg' || fParam === 'jpg');
-  // if useJpeg true => don't use webp, else use webp
+  // parsing flags & parameters
+  const useJpeg = jpegParam === "1" || jpegParam === "true" || fParam === "jpeg" || fParam === "jpg";
   const useWebp = !useJpeg;
-  const grayscale = (bwParam === '1' || bwParam === 'true'); // default false
+  const grayscale = bwParam === "1" || bwParam === "true";
   const quality = parseInt(qParam, 10) || DEFAULT_QUALITY;
   const width = wParam ? parseInt(wParam, 10) : null;
   const height = hParam ? parseInt(hParam, 10) : null;
+  const kernel = kernelParam || "mitchell";
+  const noUpscale = noUpscaleParam === "1" || noUpscaleParam === "true";
+  const sharpenAmount = sharpenAmountParam ? parseFloat(sharpenAmountParam) : 0.3;
 
   try {
     let h = {};
@@ -33,7 +44,7 @@ exports.handler = async (e, t) => {
         "x-forwarded-for": e.headers && (e.headers["x-forwarded-for"] || e.ip),
         via: "1.1 bandwidth-hero",
       },
-      redirect: 'follow'
+      redirect: "follow",
     });
 
     if (!fetchRes.ok) return { statusCode: fetchRes.status || 502, body: `Upstream ${fetchRes.status}` };
@@ -42,18 +53,22 @@ exports.handler = async (e, t) => {
     const c = await fetchRes.buffer();
     const p = c.length;
 
-    if (!shouldCompress(h.get ? (h.get("content-type") || "") : "", p, false)) {
-      console.log("Bypassing... Size: ", p);
+    if (!shouldCompress(h.get ? h.get("content-type") || "" : "", p, false)) {
+      console.log("Bypassing... Size:", p);
       return {
         statusCode: 200,
         body: c.toString("base64"),
         isBase64Encoded: true,
-        headers: { "content-encoding": "identity", ...(h.raw ? {} : {}), ...(h && h.get ? { "content-type": h.get("content-type") } : {}) },
+        headers: { "content-encoding": "identity", ...(h.get ? { "content-type": h.get("content-type") } : {}) },
       };
     }
 
-    // panggil compress dengan width/height/quality/grayscale/webp
-    let { err, output, headers: g } = await compress(c, useWebp, grayscale, quality, p, width, height);
+    const { err, output, headers: g } = await compress(c, useWebp, grayscale, quality, p, width, height, {
+      kernel,
+      noEnlarge: noUpscale,
+      sharpenAmount,
+    });
+
     if (err) throw err;
 
     return {
