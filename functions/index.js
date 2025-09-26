@@ -5,18 +5,7 @@ const pick = require("../util/pick"),
   DEFAULT_QUALITY = 40;
 
 exports.handler = async (e) => {
-  let { url: r } = e.queryStringParameters || {};
-  const {
-    jpeg: jpegParam,
-    bw: bwParam,
-    w: wParam,
-    h: hParam,
-    q: qParam,
-    f: fParam,
-    k: kernelParam,
-    noUpscale: noUpscaleParam,
-    sa: sharpenAmountParam,
-  } = e.queryStringParameters || {};
+  let { url: r, w: wParam, q: qParam } = e.queryStringParameters || {};
 
   if (!r) return { statusCode: 200, body: "Bandwidth Hero Data Compression Service" };
 
@@ -24,16 +13,8 @@ exports.handler = async (e) => {
   Array.isArray(r) && (r = r.join("&url="));
   r = r.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  // parsing flags & parameters
-  const useJpeg = jpegParam === "1" || jpegParam === "true" || fParam === "jpeg" || fParam === "jpg";
-  const useWebp = !useJpeg;
-  const grayscale = bwParam === "1" || bwParam === "true";
-  const quality = parseInt(qParam, 10) || DEFAULT_QUALITY;
   const width = wParam ? parseInt(wParam, 10) : null;
-  const height = hParam ? parseInt(hParam, 10) : null;
-  const kernel = kernelParam || "mitchell";
-  const noUpscale = noUpscaleParam === "1" || noUpscaleParam === "true";
-  const sharpenAmount = sharpenAmountParam ? parseFloat(sharpenAmountParam) : 0.3;
+  const quality = parseInt(qParam, 10) || DEFAULT_QUALITY;
 
   try {
     let h = {};
@@ -54,7 +35,6 @@ exports.handler = async (e) => {
     const p = c.length;
 
     if (!shouldCompress(h.get ? h.get("content-type") || "" : "", p, false)) {
-      console.log("Bypassing... Size:", p);
       return {
         statusCode: 200,
         body: c.toString("base64"),
@@ -63,11 +43,8 @@ exports.handler = async (e) => {
       };
     }
 
-    const { err, output, headers: g } = await compress(c, useWebp, grayscale, quality, p, width, height, {
-      kernel,
-      noEnlarge: noUpscale,
-      sharpenAmount,
-    });
+    // compress, hanya pakai width & quality
+    const { err, output, headers: g } = await compress(c, width, quality, p);
 
     if (err) throw err;
 
