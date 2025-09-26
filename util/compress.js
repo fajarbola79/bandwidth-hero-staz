@@ -1,38 +1,74 @@
 const sharp = require("sharp");
 
-function compress(imageBuffer, useWebp, grayscale, quality, originalSize, width = null, height = null) {
-  // tentukan format akhir
+/**
+ * compress(imageBuffer, useWebp, grayscale, quality, originalSize, width, height, opts)
+ * opts: { kernel, noEnlarge, sharpenAmount }
+ */
+function compress(
+  imageBuffer,
+  useWebp,
+  grayscale,
+  quality,
+  originalSize,
+  width = null,
+  height = null,
+  opts = {}
+) {
   const format = useWebp ? "webp" : "jpeg";
+  const kernel = opts.kernel || "mitchell";
+  const noEnlarge = opts.noEnlarge !== undefined ? !!opts.noEnlarge : true;
+  const sharpenAmount = typeof opts.sharpenAmount === "number" ? opts.sharpenAmount : 0.3;
 
-  let pipeline = sharp(imageBuffer);
+  let pipeline = sharp(imageBuffer, { animated: false });
 
-  // resize jika diminta
-  if (width || height) {
-    pipeline = pipeline.resize(width || null, height || null, { fit: 'inside' }); // atau 'cover' jika mau crop
-  }
+  return pipeline.metadata().then((meta) => {
+    if (width || height) {
+      pipeline = pipeline.resize(width || null, height || null, {
+        fit: "inside",
+        kernel,
+        withoutEnlargement: noEnlarge,
+      });
+    }
 
-  // apply grayscale only if explicitly requested
-  if (grayscale) pipeline = pipeline.grayscale();
+    if (grayscale) pipeline = pipeline.grayscale();
 
-  // jika output jpeg dan gambar semula ada alpha channel, flatten agar tidak jadi background hitam
-  if (!useWebp) {
-    pipeline = pipeline.flatten({ background: { r: 255, g: 255, b: 255 } }); // putih background
-  }
+    const didDownscale =
+      (width && meta.width && width < meta.width) ||
+      (height && meta.height && height < meta.height);
 
-  return pipeline
-    .toFormat(format, { quality: Math.max(1, Math.min(100, parseInt(quality, 10) || 80)), progressive: true, optimiseScans: true })
-    .toBuffer({ resolveWithObject: true })
-    .then(({ data, info }) => ({
-      err: null,
-      headers: {
-        "content-type": info.format === 'jpeg' ? 'image/jpeg' : `image/${info.format}`,
-        "content-length": info.size,
-        "x-original-size": originalSize,
-        "x-bytes-saved": originalSize - info.size,
-      },
-      output: data,
-    }))
-    .catch((err) => ({ err }));
+    if (didDownscale && sharpenAmount > 0) {
+      const sigma = Math.max(0.3, 1.0 - sharpenAmount);
+      pipeline = pipeline.sharpen(sigma);
+    }
+
+    if (!useWebp) {
+      pipeline = pipeline.flatten({ background: { r: 255, g: 255, b: 255 } });
+    }
+
+    const q = Math.max(1, Math.min(100, parseInt(quality, 10) || 80));
+
+    if (useWebp) {
+      pipeline = pipeline.toFormat("webp", { quality: q, nearLossless: false });
+    } else {
+      pipeline = pipeline.toFormat("jpeg", { quality: q, progressive: true, mozjpeg: true, chromaSubsampling: "4:4:4" });
+    }
+
+    return pipeline
+      .toBuffer({ resolveWithObject: true })
+      .then(({ data, info }) => ({
+        err: null,
+        headers: {
+          "content-type": info.format === "jpeg" ? "image/jpeg" : `image/${info.format}`,
+          "content-length": info.size,
+          "x-original-size": originalSize,
+          "x-bytes-saved": originalSize - info.size,
+          "x-used-kernel": kernel,
+          "x-did-downscale": didDownscale ? "1" : "0",
+        },
+        output: data,
+      }))
+      .catch((err) => ({ err }));
+  });
 }
 
 module.exports = compress;
