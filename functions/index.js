@@ -11,7 +11,6 @@ exports.handler = async (e, t) => {
   const quality = parseInt(q, 10) || 70;
 
   try {
-    // Ambil gambar asli
     let h = {};
     const { data: c, type: l } = await fetch(r, {
       headers: {
@@ -30,7 +29,7 @@ exports.handler = async (e, t) => {
       return { statusCode: 500, body: "Failed to fetch image" };
     }
 
-    let { err, output, headers } = await compress(c, width, quality);
+    let { err, output, headers } = await compress(c, width, quality, c.length);
     if (err) throw err;
 
     return {
