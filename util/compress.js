@@ -1,4 +1,3 @@
-// compress.js
 const sharp = require("sharp");
 
 function compress(imageBuffer, width, quality) {
@@ -8,7 +7,7 @@ function compress(imageBuffer, width, quality) {
       withoutEnlargement: true,
       kernel: sharp.kernel.lanczos3,
     })
-    .sharpen(1.5, 1, 1) // agresif, bikin detail lebih muncul
+    .sharpen(1.5, 1, 1)
     .jpeg({
       quality: quality || 70,
       progressive: true,
