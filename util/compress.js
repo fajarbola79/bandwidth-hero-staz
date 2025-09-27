@@ -1,10 +1,9 @@
 const sharp = require("sharp");
 
-async function compress(imageBuffer, width = null, quality = 75, originalSize = null) {
+async function compress(imageBuffer, width = null, quality = 80, originalSize = null) {
   const kernel = sharp.kernel.lanczos3;
-  const blurSigma = 0.3;
-  const sharpenParams = { sigma: 0.5, flat: 1, jagged: 2 };
-  const q = Math.max(1, Math.min(100, parseInt(quality, 10) || 75));
+  const blurSigma = 0.4;
+  const q = Math.max(1, Math.min(100, parseInt(quality, 10) || 80));
 
   let pipeline = sharp(imageBuffer, { animated: false });
   const meta = await pipeline.metadata();
@@ -20,12 +19,6 @@ async function compress(imageBuffer, width = null, quality = 75, originalSize = 
       withoutEnlargement: true,
     });
   }
-
-  pipeline = pipeline.sharpen(
-    sharpenParams.sigma,
-    sharpenParams.flat,
-    sharpenParams.jagged
-  );
 
   pipeline = pipeline.toFormat("jpeg", {
     quality: q,
