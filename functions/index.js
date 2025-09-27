@@ -1,61 +1,49 @@
-const pick = require("../util/pick"),
-  fetch = require("node-fetch"),
-  shouldCompress = require("../util/shouldCompress"),
-  compress = require("../util/compress"),
-  DEFAULT_QUALITY = 40;
+const fetch = require("node-fetch");
+const compress = require("../util/compress");
 
-exports.handler = async (e) => {
-  let { url: r, w: wParam, q: qParam } = e.queryStringParameters || {};
+exports.handler = async (e, t) => {
+  let { url: r, w, q } = e.queryStringParameters;
+  if (!r) {
+    return { statusCode: 200, body: "Image resize/compress service" };
+  }
 
-  if (!r) return { statusCode: 200, body: "Bandwidth Hero Data Compression Service" };
-
-  try { r = JSON.parse(r); } catch {}
-  Array.isArray(r) && (r = r.join("&url="));
-  r = r.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
-
-  const width = wParam ? parseInt(wParam, 10) : null;
-  const quality = parseInt(qParam, 10) || DEFAULT_QUALITY;
+  const width = parseInt(w, 10) || null;
+  const quality = parseInt(q, 10) || 70;
 
   try {
+    // Ambil gambar asli
     let h = {};
-    const fetchRes = await fetch(r, {
+    const { data: c, type: l } = await fetch(r, {
       headers: {
-        ...pick(e.headers || {}, ["cookie", "dnt", "referer"]),
-        "user-agent": "Bandwidth-Hero Compressor",
-        "x-forwarded-for": e.headers && (e.headers["x-forwarded-for"] || e.ip),
-        via: "1.1 bandwidth-hero",
+        "user-agent": "Netlify Image Proxy",
       },
-      redirect: "follow",
-    });
+    }).then(async (res) =>
+      res.ok
+        ? ({
+            data: await res.buffer(),
+            type: res.headers.get("content-type") || "",
+          })
+        : { statusCode: res.status || 302 }
+    );
 
-    if (!fetchRes.ok) return { statusCode: fetchRes.status || 502, body: `Upstream ${fetchRes.status}` };
-
-    h = fetchRes.headers;
-    const c = await fetchRes.buffer();
-    const p = c.length;
-
-    if (!shouldCompress(h.get ? h.get("content-type") || "" : "", p, false)) {
-      return {
-        statusCode: 200,
-        body: c.toString("base64"),
-        isBase64Encoded: true,
-        headers: { "content-encoding": "identity", ...(h.get ? { "content-type": h.get("content-type") } : {}) },
-      };
+    if (!c) {
+      return { statusCode: 500, body: "Failed to fetch image" };
     }
 
-    // compress, hanya pakai width & quality
-    const { err, output, headers: g } = await compress(c, width, quality, p);
-
+    let { err, output, headers } = await compress(c, width, quality);
     if (err) throw err;
 
     return {
       statusCode: 200,
       body: output.toString("base64"),
       isBase64Encoded: true,
-      headers: { "content-encoding": "identity", ...g },
+      headers: {
+        "content-encoding": "identity",
+        ...headers,
+      },
     };
   } catch (f) {
     console.error(f);
-    return { statusCode: 500, body: f.message || String(f) };
+    return { statusCode: 500, body: f.message || "Internal Error" };
   }
 };
