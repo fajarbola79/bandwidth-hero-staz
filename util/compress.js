@@ -2,7 +2,7 @@ const sharp = require("sharp");
 
 async function compress(imageBuffer, width = null, quality = 75, originalSize = null) {
   const kernel = sharp.kernel.lanczos3;
-  const blurSigma = 0.25;
+  const blurSigma = 0.3;
   const sharpenParams = { sigma: 0.5, flat: 1, jagged: 2 };
   const q = Math.max(1, Math.min(100, parseInt(quality, 10) || 75));
 
