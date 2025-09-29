@@ -18,7 +18,7 @@ It downloads original image and transforms it with [Sharp](https://github.com/lo
 
 You need to deploy the functions to Netlify:
 
-[![Deploy](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://SupKelelawar.github.com/bandwidth-hero)
+[![Deploy](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/SupKelelawar/bandwidth-hero)
 
 Then, in the **Data Compression Service** in Bandwidth Hero extension, add `https://your-netlify-domain.netlify.app/api/index`, and you are good to go.
 
